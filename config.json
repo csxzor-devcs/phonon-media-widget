@@ -1,0 +1,34 @@
+{
+    "animation_speed": 0.44,
+    "auto_hide_delay": 250,
+    "show_artist": true,
+    "show_progress": true,
+    "show_controls": true,
+    "theme": {
+        "bg_color": "#000000",
+        "fg_color": "#FFFFFF",
+        "accent_color": "#F0F0F0"
+    },
+    "interaction": {
+        "hover_zone_height": 14,
+        "keep_visible_zone_buffer": 50,
+        "lip_size": 9,
+        "y_offset": 7
+    },
+    "show_title": true,
+    "mode": "island",
+    "dynamic_island_enabled": true,
+    "normal_geometry": "334x100+843+400",
+    "theme_name": "Dark Mode",
+    "accent_color": "#FFFFFF",
+    "ambilight_enabled": true,
+    "gestures_enabled": true,
+    "size_mode": "expanded",
+    "island_border_radius": 27,
+    "normal_border_radius": 29,
+    "stiffness": 410,
+    "damping": 49,
+    "island_width": 510,
+    "island_height": 130,
+    "ambilight_intensity": 95
+}

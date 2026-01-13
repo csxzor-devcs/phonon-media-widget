@@ -1,0 +1,9 @@
+winrt-Windows.Media.Control
+winrt-Windows.Foundation
+winrt-Windows.Storage.Streams
+winrt-Windows.Security.Cryptography
+Pillow
+customtkinter
+pystray
+darkdetect
+pywin32
