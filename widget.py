@@ -827,7 +827,11 @@ class MediaWidget(tk.Tk):
             windll.kernel32.CloseHandle(self._app_mutex)
         
         self.destroy()
-        subprocess.Popen([sys.executable, "widget.py"], cwd=os.getcwd())
+        if getattr(sys, 'frozen', False):
+            # Running as EXE
+            subprocess.Popen([sys.executable], cwd=os.getcwd())
+        else:
+            subprocess.Popen([sys.executable, "widget.py"], cwd=os.getcwd())
 
     def setup_ui(self):
         if not hasattr(self, 'canvas'):
