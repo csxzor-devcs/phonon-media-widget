@@ -1182,7 +1182,13 @@ class MediaWidget(tk.Tk):
             windll.kernel32.CloseHandle(self._app_mutex)
         
         self.destroy()
-        subprocess.Popen([sys.executable, "widget.py"], cwd=os.getcwd())
+        
+        if getattr(sys, 'frozen', False):
+            # Running as EXE
+            subprocess.Popen([sys.executable], cwd=os.getcwd())
+        else:
+            # Running as script
+            subprocess.Popen([sys.executable, "widget.py"], cwd=os.getcwd())
 
     # ═══════════════════════════════════════════════════════════
     # SYSTEM TRAY INTEGRATION
@@ -1809,13 +1815,17 @@ class MediaWidget(tk.Tk):
                     thumb_stream = None
                     props = await self.session.try_get_media_properties_async()
                     
-                    # HOLD LOGIC: If properties are empty during track transition, don't update yet
+                    # HOLD LOGIC: If properties are empty OR generic during track transition, don't update yet
                     # Some sessions report empty properties for a few ms when track changes
-                    title = props.title if props.title else ""
-                    artist = props.artist if props.artist else ""
+                    title = (props.title or "").strip()
+                    artist = (props.artist or "").strip()
                     
-                    if not title and not artist and (time.time() - self.last_media_time) < self.content_hold_duration:
-                        # Skip this tick to hold previous content if we lost info briefly
+                    # More aggressive generic check to catch browser/app placeholders like "Spotify" or "-"
+                    is_generic = (not title or title.lower() in ["unknown title", "spotify", "no media", "play something..."]) and \
+                                 (not artist or artist.lower() in ["unknown artist", "artist", "-", "."])
+                    
+                    if is_generic and (time.time() - self.last_media_time) < self.content_hold_duration:
+                        # Skip this tick to hold previous content if we lost info or got generic info briefly
                         await asyncio.sleep(0.3)
                         continue
 
@@ -2190,12 +2200,15 @@ class MediaWidget(tk.Tk):
                         if hasattr(self, 'placeholder_id_rect'):
                             self.canvas.itemconfig(self.placeholder_id_rect, state="normal")
                 else:
-                    if hasattr(self, 'last_pil_img'): 
-                        del self.last_pil_img
-                        if hasattr(self, 'last_thumb_hash'):
-                            del self.last_thumb_hash
-                    self.canvas.itemconfig(self.art_id, state="hidden")
-                    self.apply_glow_bg(None)
+                    # ONLY hide art if we've officially timed out on having any media
+                    # This prevents the art from disappearing during the 'transition gap'
+                    if (time.time() - self.last_media_time) > self.content_hold_duration or not title or title == "No Media":
+                        if hasattr(self, 'last_pil_img'): 
+                            del self.last_pil_img
+                            if hasattr(self, 'last_thumb_hash'):
+                                del self.last_thumb_hash
+                        self.canvas.itemconfig(self.art_id, state="hidden")
+                        self.apply_glow_bg(None)
             
             # Transition binary state colors (Optional: Can keep for other icons)
             # Binary state check
