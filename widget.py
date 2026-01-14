@@ -217,7 +217,7 @@ THEMES = {
     "Dark Mode": {
         "bg_color": "#000000",
         "fg_color": "#FFFFFF",
-        "sub_color": "#909090",
+        "sub_color": "#B0B0B0", # Lightened for visibility on Ambilight
         "accent_color": "#FFFFFF",
         "show_art": True,
         "show_timeline": True,
@@ -412,7 +412,7 @@ class MediaWidget(tk.Tk):
         self.auto_hide_delay = 250
         self.stiffness = 410
         self.damping = 49
-        self.ambilight_enabled = False
+        self.ambilight_enabled = True
         self.ambilight_intensity = 0.95
         self.hover_zone_height = 14
         self.lip_size = 9
@@ -965,14 +965,20 @@ class MediaWidget(tk.Tk):
             ctrl_y = -100 # No controls in minimalist? Let's hide them.
 
         if self.show_title:
+            # SHADOW: Softer color (#121212) and smaller offset for a more premium look
+            self.title_shadow_id = self.canvas.create_text(text_x + 1, title_y + 1, text="", font=self.font_title, fill="#121212", anchor="center", tags="expanded_ui")
             self.title_id = self.canvas.create_text(text_x, title_y, text="Waiting...", font=self.font_title, fill=self.fg_color, anchor="center", tags="expanded_ui")
         else:
             self.title_id = self.canvas.create_text(-1000, -1000, text="", tags="expanded_ui")
+            self.title_shadow_id = self.canvas.create_text(-1000, -1000, text="", tags="expanded_ui")
         
         if self.show_artist:
+            # SHADOW: Softer color (#121212) and smaller offset
+            self.artist_shadow_id = self.canvas.create_text(text_x + 0.8, artist_y + 0.8, text="", font=self.font_artist, fill="#121212", anchor="center", tags="expanded_ui")
             self.artist_id = self.canvas.create_text(text_x, artist_y, text="-", font=self.font_artist, fill=self.artist_fg, anchor="center", tags="expanded_ui")
         else:
             self.artist_id = self.canvas.create_text(-1000, -1000, text="", tags="expanded_ui")
+            self.artist_shadow_id = self.canvas.create_text(-1000, -1000, text="", tags="expanded_ui")
 
         # Time Labels and Bar
         if self.show_progress:
@@ -984,7 +990,10 @@ class MediaWidget(tk.Tk):
             bar_x2 = text_x + bar_w_half
             self.bar_coords = (bar_x1, self.bar_y, bar_x2, self.bar_y)
             
+            self.lbl_curr_time_shadow = self.canvas.create_text(bar_x1 - (10 * scale) + 0.5, self.bar_y + 0.5, text="0:00", font=self.font_time, fill="#121212", anchor="e", tags="expanded_ui")
             self.lbl_curr_time = self.canvas.create_text(bar_x1 - (10 * scale), self.bar_y, text="0:00", font=self.font_time, fill=self.fg_color, anchor="e", tags="expanded_ui")
+            
+            self.lbl_total_time_shadow = self.canvas.create_text(bar_x2 + (10 * scale) + 0.5, self.bar_y + 0.5, text="0:00", font=self.font_time, fill="#121212", anchor="w", tags="expanded_ui")
             self.lbl_total_time = self.canvas.create_text(bar_x2 + (10 * scale), self.bar_y, text="0:00", font=self.font_time, fill=self.fg_color, anchor="w", tags="expanded_ui")
 
             # Thicker bar (4px)
@@ -1333,7 +1342,10 @@ class MediaWidget(tk.Tk):
         if hasattr(self, 'current_media_end') and self.current_media_end > 0:
             pct = (clamped_x - bx1) / (bx2 - bx1)
             sec = pct * self.current_media_end
-            self.canvas.itemconfig(self.lbl_curr_time, text=self.format_time(sec))
+            t_str = self.format_time(sec)
+            self.canvas.itemconfig(self.lbl_curr_time, text=t_str)
+            if hasattr(self, 'lbl_curr_time_shadow'):
+                self.canvas.itemconfig(self.lbl_curr_time_shadow, text=t_str)
 
     def pulse_btn(self, item):
         # Determine original color if possible, or just use white/artist_fg
@@ -1507,7 +1519,11 @@ class MediaWidget(tk.Tk):
         dy_t = getattr(self, 'title_dy', 0)
         dy_a = getattr(self, 'artist_dy', 0)
         
+        offset = 0.8 * scale
+        self.canvas.coords(self.title_shadow_id, text_x + offset, title_y + dy_t + offset)
         self.canvas.coords(self.title_id, text_x, title_y + dy_t)
+        
+        self.canvas.coords(self.artist_shadow_id, text_x + offset, artist_y + dy_a + offset)
         self.canvas.coords(self.artist_id, text_x, artist_y + dy_a)
         
         if self.show_progress:
@@ -1516,7 +1532,9 @@ class MediaWidget(tk.Tk):
             self.bar_coords = (bar_x1, bar_y, bar_x2, bar_y)
             
             self.canvas.coords(self.bar_bg_id, bar_x1, bar_y, bar_x2, bar_y)
+            self.canvas.coords(self.lbl_curr_time_shadow, bar_x1 - (10 * scale) + 0.5, bar_y + 0.5)
             self.canvas.coords(self.lbl_curr_time, bar_x1 - (10 * scale), bar_y)
+            self.canvas.coords(self.lbl_total_time_shadow, bar_x2 + (10 * scale) + 0.5, bar_y + 0.5)
             self.canvas.coords(self.lbl_total_time, bar_x2 + (10 * scale), bar_y)
             
             if not self.dragging_slider:
@@ -1829,8 +1847,19 @@ class MediaWidget(tk.Tk):
                         await asyncio.sleep(0.3)
                         continue
 
+                    # SECONDARY FILTER: Even if artist is valid, if Title is bad, don't show it during hold
+                    bad_title = not title or title.lower() in ["unknown title", "spotify", "no media", "play something..."]
+                    if bad_title and (time.time() - self.last_media_time) < self.content_hold_duration:
+                        await asyncio.sleep(0.3) 
+                        continue
+
                     if not title: title = "Unknown Title"
                     if not artist: artist = "Unknown Artist"
+                    
+                    # FINAL SAFETY: If we resolved to Unknown Title, block it for 5s
+                    if title == "Unknown Title" and (time.time() - self.last_media_time) < self.content_hold_duration:
+                        await asyncio.sleep(0.3)
+                        continue
                     thumb_data = None
                     if props.thumbnail:
                         try:
@@ -2187,21 +2216,20 @@ class MediaWidget(tk.Tk):
                 if thumb_hash:
                     self.last_thumb_hash = thumb_hash
                 
-                # REMOVED: Instant clear of art. We now keep old art until new art is ready to prevent flashing.
-                pass
+                # --- SYNC TEXT AND ART ---
+                # Only update art if we have data. 
+                # If art is missing (None) but track changed, we might be in a gap.
+                # But here we are just updating the visual state.
                 
-                # Force art update (thumb_stream is now thumb_data - raw bytes)
-                if thumb_stream:  # thumb_stream is actually thumb_data now
+                if thumb_stream: 
                     try:
-                        self.update_art_image(thumb_stream)  # Direct call, no async needed
+                        self.update_art_image(thumb_stream) 
                     except Exception as e:
                         print(f"ERROR: Failed to update album art: {e}")
-                        # Keep placeholder visible on error
                         if hasattr(self, 'placeholder_id_rect'):
                             self.canvas.itemconfig(self.placeholder_id_rect, state="normal")
                 else:
                     # ONLY hide art if we've officially timed out on having any media
-                    # This prevents the art from disappearing during the 'transition gap'
                     if (time.time() - self.last_media_time) > self.content_hold_duration or not title or title == "No Media":
                         if hasattr(self, 'last_pil_img'): 
                             del self.last_pil_img
@@ -2209,6 +2237,13 @@ class MediaWidget(tk.Tk):
                                 del self.last_thumb_hash
                         self.canvas.itemconfig(self.art_id, state="hidden")
                         self.apply_glow_bg(None)
+            
+            # --- Text Update Logic (SYNCED) ---
+            # If track changed, we want to update text ONLY when art is ready or timeout
+            if track_changed and not thumb_stream and (time.time() - self.last_media_time) < 2.0:
+                 # If we have a new track but NO art yet, and it's been less than 2s, 
+                 # HOLD OLD TEXT to match old art (which we are holding above)
+                 return
             
             # Transition binary state colors (Optional: Can keep for other icons)
             # Binary state check
@@ -2246,14 +2281,15 @@ class MediaWidget(tk.Tk):
             self.fade_text(self.artist_id, final_artist)
 
             self.canvas.itemconfig(self.lbl_total_time, text=self.format_time(end))
-
-            self.canvas.itemconfig(self.lbl_total_time, text=self.format_time(end))
+            if hasattr(self, 'lbl_total_time_shadow'):
+                self.canvas.itemconfig(self.lbl_total_time_shadow, text=self.format_time(end))
             
             self.update_play_pause_ui(status)
             
             if not self.dragging_slider:
                 self.canvas.itemconfig(self.lbl_curr_time, text=self.format_time(pos))
-                bx1, _, bx2, _ = self.bar_coords
+                if hasattr(self, 'lbl_curr_time_shadow'):
+                    self.canvas.itemconfig(self.lbl_curr_time_shadow, text=self.format_time(pos))
                 width = bx2 - bx1
                 self.last_ratio = 0
                 if pos is not None and end is not None and end > 0:
@@ -2431,10 +2467,11 @@ class MediaWidget(tk.Tk):
         # This creates better contrast for text regardless of intensity
         overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         overlay_draw = ImageDraw.Draw(overlay)
-        text_area_start = int(w * 0.45)  # After album art
-        # Create gradient from transparent to semi-dark
+        text_area_start = int(w * 0.40)  # Start slightly earlier to cover more text area
+        # Create gradient from transparent to dark (increased opacity for readability)
         for i in range(text_area_start, w):
-            opacity = int(30 * ((i - text_area_start) / (w - text_area_start)))  # 0-30% dark
+            # Gradual increase from 0 to 75% opacity (0 to 190 in 0-255 scale)
+            opacity = int(190 * ((i - text_area_start) / (w - text_area_start)))
             overlay_draw.rectangle([i, 0, i+1, h], fill=(0, 0, 0, opacity))
         
         blended_rgba = blended.convert("RGBA")
@@ -2464,8 +2501,19 @@ class MediaWidget(tk.Tk):
 
     def fade_text(self, item_id, new_text):
         """Pure vertical scroll transition without color flicker."""
+        if not hasattr(self, 'fade_targets'): self.fade_targets = {}
+        
+        # If we are already animating to this exact text, DO NOT restart the animation
+        # (This prevents flickering during rapid updates)
+        if self.fade_targets.get(item_id) == new_text:
+            return
+            
         current_text = self.canvas.itemcget(item_id, "text")
-        if current_text == new_text: return
+        if current_text == new_text: 
+            return
+        
+        # New target text
+        self.fade_targets[item_id] = new_text
         
         if not hasattr(self, 'fade_jobs'): self.fade_jobs = {}
         prop_dy = "title_dy" if item_id == self.title_id else "artist_dy"
@@ -2486,6 +2534,9 @@ class MediaWidget(tk.Tk):
                     self.fade_jobs[item_id] = self.after(delay, lambda: animate(step + 1, 0))
                 else:
                     self.canvas.itemconfig(item_id, text=new_text)
+                    # Sync Shadow Text
+                    shadow_id = self.title_shadow_id if item_id == self.title_id else self.artist_shadow_id
+                    self.canvas.itemconfig(shadow_id, text=new_text)
                     animate(0, 1)
             else:
                 # Slide IN (Up from bottom)
