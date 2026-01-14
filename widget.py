@@ -1310,8 +1310,12 @@ class MediaWidget(tk.Tk):
             dy = event.y_root - self.drag_start_y
             self.width = max(300, self.win_start_w + dx)
             self.height = max(100, self.win_start_h + dy)
-            # We don't call setup_ui here anymore to avoid jitter/resetting items.
-            # The physics loop (animate_physics) will handle the visual scaling.
+            
+            # Live Resize: Force update immediately 1:1 with mouse
+            self.current_width = self.width
+            self.current_height = self.height
+            self.geometry(f"{int(self.current_width)}x{int(self.current_height)}+{int(self.current_x)}+{int(self.current_y)}")
+            self.update_ui_animation()
             
     def on_release(self, event):
         # Reset Geature State
@@ -1699,7 +1703,8 @@ class MediaWidget(tk.Tk):
             # Initialize COM for the background thread
             try:
                 import ctypes
-                ctypes.windll.ole32.CoInitializeEx(0, 0x0) # COINIT_MULTITHREADED
+                # Try standard STA initialization first
+                ctypes.windll.ole32.CoInitialize(None)
             except: pass
 
             print("DEBUG: Background thread started.")
@@ -1749,6 +1754,16 @@ class MediaWidget(tk.Tk):
             # SMART SESSION SELECTION: Prioritize playing sessions over paused ones
             try:
                 all_sessions = self.manager.get_sessions()
+                
+                # DEBUG: Log session count if empty or changed
+                if not hasattr(self, 'last_session_count') or self.last_session_count != len(all_sessions):
+                    try:
+                        with open("debug_media.log", "a") as f:
+                            f.write(f"Sessions Found: {len(all_sessions)}\n")
+                            for s in all_sessions:
+                                f.write(f" - {s.source_app_user_model_id}\n")
+                    except: pass
+                    self.last_session_count = len(all_sessions)
                 
                 # TWO-PASS FILTERING: First find if ANY session is playing
                 has_playing_session = False
