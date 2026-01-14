@@ -13,8 +13,8 @@
 
 ## Installation
 
-1.  Download the latest `MediaIsland.exe` from the [Releases](https://github.com/Your_GitHub_Username/media-island-widget/releases) page.
-2.  Run `MediaIsland.exe`.
+1.  Download the latest `Phonon.exe` from the [Releases](https://github.com/csxzor-devcs/phonon-media-widget/releases) page.
+2.  Run `Phonon.exe`.
 3.  The widget will appear at the top of your screen.
 
 ## Development
