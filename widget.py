@@ -1707,8 +1707,8 @@ class MediaWidget(tk.Tk):
             # Initialize COM for the background thread
             try:
                 import ctypes
-                # Try standard STA initialization first
-                ctypes.windll.ole32.CoInitialize(None)
+                # Use MTA for WinRT compatibility
+                ctypes.windll.ole32.CoInitializeEx(0, 0x0)
             except: pass
 
             print("DEBUG: Background thread started.")
