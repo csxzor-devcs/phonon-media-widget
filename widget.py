@@ -2296,6 +2296,13 @@ class MediaWidget(tk.Tk):
                 self.canvas.itemconfig(self.lbl_curr_time, text=self.format_time(pos))
                 if hasattr(self, 'lbl_curr_time_shadow'):
                     self.canvas.itemconfig(self.lbl_curr_time_shadow, text=self.format_time(pos))
+                
+                # FIX: Unpack coordinates from self.bar_coords
+                try:
+                    bx1, by, bx2, _ = self.bar_coords
+                except:
+                    bx1, by, bx2 = 0, 0, 0
+
                 width = bx2 - bx1
                 self.last_ratio = 0
                 if pos is not None and end is not None and end > 0:
@@ -2303,9 +2310,9 @@ class MediaWidget(tk.Tk):
                 
                 new_x = bx1 + (width * self.last_ratio)
                 
-                self.canvas.coords(self.bar_val_id, bx1, self.bar_y, new_x, self.bar_y)
+                self.canvas.coords(self.bar_val_id, bx1, by, new_x, by)
                 dot_r = 5.0 * (self.height / 125)
-                self.canvas.coords(self.dot_id, new_x-dot_r, self.bar_y-dot_r, new_x+dot_r, self.bar_y+dot_r)
+                self.canvas.coords(self.dot_id, new_x-dot_r, by-dot_r, new_x+dot_r, by+dot_r)
 
             # Logic moved to cache block above
             # if thumb_stream:
