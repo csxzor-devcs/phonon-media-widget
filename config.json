@@ -16,9 +16,9 @@
         "y_offset": 7
     },
     "show_title": true,
-    "mode": "normal",
+    "mode": "island",
     "dynamic_island_enabled": true,
-    "normal_geometry": "434x110+905+428",
+    "normal_geometry": "434x110+906+427",
     "theme_name": "Dark Mode",
     "accent_color": "#FFFFFF",
     "ambilight_enabled": true,

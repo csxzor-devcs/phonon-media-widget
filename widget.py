@@ -1759,16 +1759,6 @@ class MediaWidget(tk.Tk):
             try:
                 all_sessions = self.manager.get_sessions()
                 
-                # DEBUG: Log session count if empty or changed
-                if not hasattr(self, 'last_session_count') or self.last_session_count != len(all_sessions):
-                    try:
-                        with open("debug_media.log", "a") as f:
-                            f.write(f"Sessions Found: {len(all_sessions)}\n")
-                            for s in all_sessions:
-                                f.write(f" - {s.source_app_user_model_id}\n")
-                    except: pass
-                    self.last_session_count = len(all_sessions)
-                
                 # TWO-PASS FILTERING: First find if ANY session is playing
                 has_playing_session = False
                 for session in all_sessions:
