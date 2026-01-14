@@ -444,7 +444,7 @@ class MediaWidget(tk.Tk):
         
         # Content Hold Time (prevent "No Media" flash)
         self.last_media_time = 0  # Last time we had valid media
-        self.content_hold_duration = 2.0  # Keep showing old content for 2s when no session
+        self.content_hold_duration = 5.0  # Keep showing old content for 5s when no session
         
         # Gesture Tracking State
         self.gesture_start_x = 0
@@ -1664,6 +1664,12 @@ class MediaWidget(tk.Tk):
             except: pass
     def run_async_loop(self):
         try:
+            # Initialize COM for the background thread
+            try:
+                import ctypes
+                ctypes.windll.ole32.CoInitializeEx(0, 0x0) # COINIT_MULTITHREADED
+            except: pass
+
             print("DEBUG: Background thread started.")
             asyncio.set_event_loop(self.loop)
             print("DEBUG: Event loop set. Starting run_forever().")
@@ -1802,10 +1808,19 @@ class MediaWidget(tk.Tk):
                 try:
                     thumb_stream = None
                     props = await self.session.try_get_media_properties_async()
-                    title = props.title if props.title else "Unknown Title"
-                    artist = props.artist if props.artist else "Unknown Artist"
                     
-                    # OPTIMIZATION: Fetch thumbnail bytes immediately to reduce delay
+                    # HOLD LOGIC: If properties are empty during track transition, don't update yet
+                    # Some sessions report empty properties for a few ms when track changes
+                    title = props.title if props.title else ""
+                    artist = props.artist if props.artist else ""
+                    
+                    if not title and not artist and (time.time() - self.last_media_time) < self.content_hold_duration:
+                        # Skip this tick to hold previous content if we lost info briefly
+                        await asyncio.sleep(0.3)
+                        continue
+
+                    if not title: title = "Unknown Title"
+                    if not artist: artist = "Unknown Artist"
                     thumb_data = None
                     if props.thumbnail:
                         try:
@@ -1852,31 +1867,25 @@ class MediaWidget(tk.Tk):
                  current_time = time.time()
                  time_since_media = current_time - self.last_media_time
                  
-                 # Only show "No Media" if we've had no session for content_hold_duration
+                 # Only show "No Media" if we've had no session for a LONG time
                  if time_since_media > self.content_hold_duration:
-                     # FALLBACK: If current_session is None, check if there are any active sessions at all
                      try:
                         all_sessions = self.manager.get_sessions()
-                        if all_sessions and len(all_sessions) > 0:
-                            # Find Spotify or just take the first one
-                            fallback_session = None
-                            for s in all_sessions:
-                                if "Spotify" in s.source_app_user_model_id:
-                                    fallback_session = s
-                                    break
-                            if not fallback_session:
-                                fallback_session = all_sessions[0]
-                            
-                            # Use this session for one tick
-                            self.session = fallback_session
-                            print(f"DEBUG: Falling back to session: {fallback_session.source_app_user_model_id}")
-                        else:
+                        if not all_sessions or len(all_sessions) == 0:
+                            # Only then show No Media
                             self.after(0, self.update_media_state, "No Media", "Play something...", 0, 100, 5, None, False, 0)
+                        else:
+                            # We have sessions but none selected? Try to grab the first active one
+                            for s in all_sessions:
+                                info = s.get_playback_info()
+                                if info and info.playback_status == 4: # Playing
+                                    self.session = s
+                                    break
                      except:
-                        self.after(0, self.update_media_state, "No Media", "Play something...", 0, 100, 5, None, False, 0)
+                        pass
                  # else: Keep showing the last known content (do nothing)
             
-            await asyncio.sleep(0.3)  # Faster polling for quicker track change detection
+            await asyncio.sleep(0.5)  # Slightly slower but safer polling
 
     async def svc_play_pause(self):
         if self.session: await self.session.try_toggle_play_pause_async()
@@ -2168,11 +2177,8 @@ class MediaWidget(tk.Tk):
                 if thumb_hash:
                     self.last_thumb_hash = thumb_hash
                 
-                # INSTANT FEEDBACK: Clear old art immediately when track changes
-                if track_changed:
-                    self.canvas.itemconfig(self.art_id, state="hidden")
-                    if hasattr(self, 'placeholder_id_rect'):
-                        self.canvas.itemconfig(self.placeholder_id_rect, state="normal")
+                # REMOVED: Instant clear of art. We now keep old art until new art is ready to prevent flashing.
+                pass
                 
                 # Force art update (thumb_stream is now thumb_data - raw bytes)
                 if thumb_stream:  # thumb_stream is actually thumb_data now
