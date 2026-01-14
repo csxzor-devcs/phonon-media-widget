@@ -390,9 +390,22 @@ class MediaWidget(tk.Tk):
         self.sticky = False
         self.dynamic_island_enabled = True
         
-        # Load Config
+        # Customization defaults (MUST be before load_config)
+        self.animation_speed = 0.44
+        self.auto_hide_delay = 250
+        self.stiffness = 410
+        self.damping = 49
+        self.ambilight_enabled = True
+        self.ambilight_intensity = 0.95
+        self.hover_zone_height = 14
+        self.lip_size = 9
+        self.y_offset = 7
+        self.x_offset = 10
+        
+        # Load Config (after all defaults are set)
         self.load_config()
         
+        # Window Setup
         self.bg_key = "#000001"
         self.overrideredirect(True)
         self.attributes('-topmost', True)
@@ -406,18 +419,6 @@ class MediaWidget(tk.Tk):
         # System Tray Setup
         self.setup_system_tray()
         self.protocol("WM_DELETE_WINDOW", self.minimize_to_tray)
-        
-        # Customization from config
-        self.animation_speed = 0.44
-        self.auto_hide_delay = 250
-        self.stiffness = 410
-        self.damping = 49
-        self.ambilight_enabled = True
-        self.ambilight_intensity = 0.95
-        self.hover_zone_height = 14
-        self.lip_size = 9
-        self.y_offset = 7
-        self.x_offset = 10 # Default
         
         # State
         self.session = None
@@ -863,15 +864,8 @@ class MediaWidget(tk.Tk):
         # 4. Save state (including the new mode flag)
         self.save_config()
         
-        # 5. Apply mode change without restarting (fixes frozen EXE crash)
-        self.setup_dimensions()
-        self.setup_ui()
-        # Force geometry update
-        self.geometry(f"{int(self.width)}x{int(self.height)}+{int(self.current_x)}+{int(self.current_y)}")
-        # Force complete redraw to fix border radius glitch
-        self.update()
-        self.update_bg_effect()  # Refresh background
-        self.update_ui_animation()
+        # 5. Restart widget for clean mode switch (fixes border radius glitch)
+        self.restart_app()
 
     def setup_ui(self):
         if not hasattr(self, 'canvas'):
@@ -1232,17 +1226,28 @@ class MediaWidget(tk.Tk):
             if getattr(sys, 'frozen', False):
                 # Running as EXE - settings.py should be bundled
                 settings_path = os.path.join(sys._MEIPASS, "settings.py")
+                # Use pythonw.exe from system Python installation or try py launcher
+                python_paths = [
+                    os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Python', 'Python313', 'pythonw.exe'),
+                    os.path.join(os.environ.get('ProgramFiles', ''), 'Python313', 'pythonw.exe'),
+                    'pythonw',  # Try PATH
+                    'python',   # Fallback
+                    'py',       # Windows py launcher
+                ]
             else:
                 # Running as script
                 settings_path = os.path.join(os.path.dirname(__file__), "settings.py")
+                python_paths = [sys.executable]
             
             if os.path.exists(settings_path):
-                # Launch settings with the correct python interpreter
-                if getattr(sys, 'frozen', False):
-                    # For frozen EXE, extract and run with system python
-                    subprocess.Popen(["python", settings_path], cwd=os.path.dirname(settings_path))
-                else:
-                    subprocess.Popen([sys.executable, settings_path])
+                for python_exe in python_paths:
+                    try:
+                        subprocess.Popen([python_exe, settings_path], cwd=os.path.dirname(settings_path) or '.')
+                        print(f"Launched settings with {python_exe}")
+                        return
+                    except FileNotFoundError:
+                        continue
+                print("Failed to find Python interpreter to launch settings")
             else:
                 print(f"Settings file not found at {settings_path}")
         except Exception as e:
