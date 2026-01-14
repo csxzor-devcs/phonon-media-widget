@@ -360,9 +360,9 @@ class MediaWidget(tk.Tk):
     def __init__(self):
         super().__init__()
         print("\n" + "="*40)
-        print(" WIDGET INITIALIZING (LOGGING ACTIVE)")
+        print(" PHONON INITIALIZING (LOGGING ACTIVE)")
         print("="*40 + "\n")
-        self.title("Media Island")
+        self.title("Phonon")
         
         # Theme State
         self.current_theme_name = "Dark Mode"

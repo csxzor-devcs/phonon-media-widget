@@ -1,6 +1,6 @@
-# Media Island
+# Phonon
 
-Media Island is a premium, lightweight Windows media controller featuring a dynamic "Dynamic Island" style interface. It brings native WinRT media integration to your desktop with a sleek, modern design.
+**Phonon** is a premium, lightweight Windows media controller featuring a physics-based "Dynamic Island" interface. It integrates natively with WinRT to provide a high-fidelity control experience with glassmorphism aesthetics and dynamic "Aura" lighting.
 
 ## Features
 
