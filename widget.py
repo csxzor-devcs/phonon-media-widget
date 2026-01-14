@@ -366,9 +366,9 @@ class MediaWidget(tk.Tk):
         
         # Theme State
         self.current_theme_name = "Dark Mode"
-        self.width = 500
-        self.height = 125
-        self.border_radius = 45
+        self.width = 510
+        self.height = 130
+        self.border_radius = 27
         self.island_color = "#000000"
         self.fg_color = "#FFFFFF"
         self.sub_color = "#AAAAAA"
@@ -376,9 +376,11 @@ class MediaWidget(tk.Tk):
         # Mode & Docking
         self.mode = "island" # 'island' or 'normal'
         self.dock_side = "top" # 'top', 'left', 'right'
-        self.normal_geometry = "500x125+100+100"
-        self.island_width = 500
-        self.island_height = 125
+        self.normal_geometry = "334x100+4+-10"
+        self.island_width = 510
+        self.island_height = 130
+        self.island_border_radius = 27
+        self.normal_border_radius = 29
         
         # Default Toggles
         self.show_title = True
@@ -406,10 +408,16 @@ class MediaWidget(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.minimize_to_tray)
         
         # Customization from config
-        inter = getattr(self, 'interaction', {})
-        self.lip_size = inter.get("lip_size", 70)
-        self.y_offset = inter.get("y_offset", 10)
-        self.x_offset = inter.get("x_offset", 10)
+        self.animation_speed = 0.44
+        self.auto_hide_delay = 250
+        self.stiffness = 410
+        self.damping = 49
+        self.ambilight_enabled = False
+        self.ambilight_intensity = 0.95
+        self.hover_zone_height = 14
+        self.lip_size = 9
+        self.y_offset = 7
+        self.x_offset = 10 # Default
         
         # State
         self.session = None
@@ -665,16 +673,16 @@ class MediaWidget(tk.Tk):
             try:
                 with open(config_path, "r") as f:
                     config = json.load(f)
-                    self.mode = config.get("mode", "island")
-                    self.normal_geometry = config.get("normal_geometry", "500x125+100+100")
+                    self.mode = config.get("mode", self.mode)
+                    self.normal_geometry = config.get("normal_geometry", self.normal_geometry)
                     
                     # A_B Isolation: Island Mode Dims
-                    self.island_width = config.get("island_width", 550)
-                    self.island_height = config.get("island_height", 140)
-                    self.island_border_radius = config.get("island_border_radius", 45)
+                    self.island_width = config.get("island_width", self.island_width)
+                    self.island_height = config.get("island_height", self.island_height)
+                    self.island_border_radius = config.get("island_border_radius", self.island_border_radius)
                     
                     # A_B Isolation: Normal Mode Dims
-                    self.normal_border_radius = config.get("normal_border_radius", 15)
+                    self.normal_border_radius = config.get("normal_border_radius", self.normal_border_radius)
                     
                     # Set Active Radius for Startup
                     self.border_radius = self.island_border_radius if self.mode == "island" else self.normal_border_radius
@@ -689,36 +697,36 @@ class MediaWidget(tk.Tk):
                             dims = self.normal_geometry.split('+')[0]
                             self.width, self.height = map(int, dims.split('x'))
                         except:
-                            self.width, self.height = 500, 125
+                            pass
                     
                     # Toggles
-                    self.show_title = config.get("show_title", True)
-                    self.show_artist = config.get("show_artist", True)
-                    self.show_progress = config.get("show_progress", True)
-                    self.show_controls = config.get("show_controls", True)
-                    self.dynamic_island_enabled = config.get("dynamic_island_enabled", True)
-                    self.ambilight_enabled = config.get("ambilight_enabled", True)
-                    self.ambilight_intensity = config.get("ambilight_intensity", 70) / 100.0  # Convert percentage to 0.0-1.0
+                    self.show_title = config.get("show_title", self.show_title)
+                    self.show_artist = config.get("show_artist", self.show_artist)
+                    self.show_progress = config.get("show_progress", self.show_progress)
+                    self.show_controls = config.get("show_controls", self.show_controls)
+                    self.dynamic_island_enabled = config.get("dynamic_island_enabled", self.dynamic_island_enabled)
+                    self.ambilight_enabled = config.get("ambilight_enabled", self.ambilight_enabled)
+                    self.ambilight_intensity = config.get("ambilight_intensity", self.ambilight_intensity * 100) / 100.0
                     
                     # Behavior
-                    self.animation_speed = config.get("animation_speed", 0.2)
-                    self.interaction = config.get("interaction", {"hover_zone_height": 10})
-                    self.hover_zone_height = self.interaction.get("hover_zone_height", 10)
-                    self.auto_hide_delay = config.get("auto_hide_delay", 100)
+                    self.animation_speed = config.get("animation_speed", self.animation_speed)
+                    inter_cfg = config.get("interaction", {})
+                    self.hover_zone_height = inter_cfg.get("hover_zone_height", self.hover_zone_height)
+                    self.auto_hide_delay = config.get("auto_hide_delay", self.auto_hide_delay)
                     
                     # Offsets
-                    self.lip_size = self.interaction.get("lip_size", 7)
-                    self.y_offset = self.interaction.get("y_offset", 10)
-                    self.x_offset = self.interaction.get("x_offset", 10)
+                    self.lip_size = inter_cfg.get("lip_size", self.lip_size)
+                    self.y_offset = inter_cfg.get("y_offset", self.y_offset)
+                    self.x_offset = inter_cfg.get("x_offset", self.x_offset)
                     
                     # Spring Physics
-                    self.stiffness = config.get("stiffness", 550)
-                    self.damping = config.get("damping", 38)
+                    self.stiffness = config.get("stiffness", self.stiffness)
+                    self.damping = config.get("damping", self.damping)
                     
                     theme_cfg = config.get("theme", {})
                     self.island_color = theme_cfg.get("bg_color", self.island_color)
                     self.fg_color = theme_cfg.get("fg_color", self.fg_color)
-                    self.current_theme_name = config.get("theme_name", "Dark Mode")
+                    self.current_theme_name = config.get("theme_name", self.current_theme_name)
                     
                     print("Config loaded and applied.")
             except Exception as e:

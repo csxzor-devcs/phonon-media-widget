@@ -18,7 +18,7 @@
     "show_title": true,
     "mode": "island",
     "dynamic_island_enabled": true,
-    "normal_geometry": "334x100+843+400",
+    "normal_geometry": "334x100+4+-10",
     "theme_name": "Dark Mode",
     "accent_color": "#FFFFFF",
     "ambilight_enabled": true,
