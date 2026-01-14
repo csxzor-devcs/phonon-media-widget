@@ -39,6 +39,8 @@ try:
     except:
         pass
 except ImportError as e:
+    with open("debug.log", "a") as f:
+        f.write(f"CRITICAL: WinRT Import Failed: {e}\n")
     print(f"WinRT import failed: {e}")
     WINRT_AVAILABLE = False
     GlobalSystemMediaTransportControlsSessionManager = None
@@ -1701,6 +1703,8 @@ class MediaWidget(tk.Tk):
             self.loop.create_task(self.monitor_media())
             self.loop.run_forever()
         except Exception as e:
+            with open("debug.log", "a") as f:
+                f.write(f"BACKGROUND LOOP CRASH: {e}\n")
             print(f"DEBUG: Background loop CRASHED: {e}")
             sys.stdout.flush()
 
@@ -1730,6 +1734,8 @@ class MediaWidget(tk.Tk):
             self.manager = await GlobalSystemMediaTransportControlsSessionManager.request_async()
             print("DEBUG: manager.request_async() success.")
         except Exception as e:
+            with open("debug.log", "a") as f:
+                f.write(f"MANAGER REQUEST FAILED: {e}\n")
             print(f"DEBUG: manager.request_async() FAILED: {e}")
             sys.stdout.flush()
             return
