@@ -668,7 +668,34 @@ class MediaWidget(tk.Tk):
                 self.canvas.configure(bg="#000000")
 
     def load_config(self):
-        config_path = "config.json"
+        # Priority 1: User config in AppData (writable)
+        config_dir = os.path.join(os.path.expanduser("~"), ".phonon")
+        user_config_path = os.path.join(config_dir, "config.json")
+        
+        # Priority 2: Bundled config (read-only fallback)
+        if getattr(sys, 'frozen', False):
+            bundled_base = sys._MEIPASS
+        else:
+            bundled_base = os.path.dirname(os.path.abspath(__file__))
+        bundled_config_path = os.path.join(bundled_base, "config.json")
+        
+        # Use user config if exists, otherwise copy bundled to user location
+        if os.path.exists(user_config_path):
+            config_path = user_config_path
+        elif os.path.exists(bundled_config_path):
+            # First run: copy bundled config to user directory
+            try:
+                os.makedirs(config_dir, exist_ok=True)
+                import shutil
+                shutil.copy(bundled_config_path, user_config_path)
+                config_path = user_config_path
+            except:
+                # If copy fails, use bundled (read-only)
+                config_path = bundled_config_path
+        else:
+            print("Config file not found, using defaults.")
+            return
+        
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r") as f:
@@ -735,7 +762,15 @@ class MediaWidget(tk.Tk):
             print("Config file not found, using defaults.")
 
     def save_config(self):
-        config_path = "config.json"
+        # Use writable location in user's AppData
+        config_dir = os.path.join(os.path.expanduser("~"), ".phonon")
+        config_path = os.path.join(config_dir, "config.json")
+        
+        # Create directory if it doesn't exist
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except: pass
+        
         data = {}
         if os.path.exists(config_path):
             try:
@@ -777,6 +812,9 @@ class MediaWidget(tk.Tk):
             with open(config_path, "w") as f:
                 data["theme_name"] = self.current_theme_name
                 json.dump(data, f, indent=4)
+        except (PermissionError, OSError) as e:
+            # Silently fail if we can't write (read-only location)
+            print(f"Warning: Cannot save config: {e}")
             # Update last mtime to prevent immediate redundant reload
             self.last_config_mtime = os.path.getmtime(config_path)
         except Exception as e:
@@ -801,6 +839,13 @@ class MediaWidget(tk.Tk):
             self.width = self.island_width
             self.height = self.island_height
             self.border_radius = self.island_border_radius
+            # Fix: Reset island position to top-center
+            self.expanded = False  # Ensure collapsed state
+            screen_w = self.winfo_screenwidth()
+            self.current_x = (screen_w - self.width) // 2
+            self.current_y = self.y_offset  # Top position
+            self.target_x = self.current_x
+            self.target_y = self.y_offset
         else:
             # Parse normal geometry to extract width, height, AND position
             try:
@@ -814,24 +859,19 @@ class MediaWidget(tk.Tk):
                 self.target_x, self.target_y = 100, 100
             self.border_radius = self.normal_border_radius
         
+        
         # 4. Save state (including the new mode flag)
         self.save_config()
         
-        # 5. RESTART the widget for clean initialization
-        #    This prevents visual glitches with border radius and ensures proper layout
-        self.running = False
-        
-        # Release mutex before restarting
-        if hasattr(self, '_app_mutex') and self._app_mutex:
-            windll.kernel32.ReleaseMutex(self._app_mutex)
-            windll.kernel32.CloseHandle(self._app_mutex)
-        
-        self.destroy()
-        if getattr(sys, 'frozen', False):
-            # Running as EXE
-            subprocess.Popen([sys.executable], cwd=os.getcwd())
-        else:
-            subprocess.Popen([sys.executable, "widget.py"], cwd=os.getcwd())
+        # 5. Apply mode change without restarting (fixes frozen EXE crash)
+        self.setup_dimensions()
+        self.setup_ui()
+        # Force geometry update
+        self.geometry(f"{int(self.width)}x{int(self.height)}+{int(self.current_x)}+{int(self.current_y)}")
+        # Force complete redraw to fix border radius glitch
+        self.update()
+        self.update_bg_effect()  # Refresh background
+        self.update_ui_animation()
 
     def setup_ui(self):
         if not hasattr(self, 'canvas'):
@@ -1176,11 +1216,37 @@ class MediaWidget(tk.Tk):
     # ═══════════════════════════════════════════════════════════
     
     def toggle_ambilight(self):
-        """Toggle ambilight and restart widget for changes to apply"""
+        """Toggle ambilight and apply changes immediately"""
         self.ambilight_enabled = not self.ambilight_enabled
         self.save_config()
-        # Restart to apply ambilight changes cleanly
-        self.restart_app()
+        # Refresh background immediately instead of restarting
+        if hasattr(self, 'last_track_key') and self.last_track_key:
+            title, artist = self.last_track_key[0], self.last_track_key[1]
+            # Force immediate redraw with current media
+            self.update_media_state(title, artist, 0, 1, 0, self.current_thumbnail_stream if hasattr(self, 'current_thumbnail_stream') else None)
+    
+    def launch_settings(self):
+        """Launch the settings GUI"""
+        try:
+            # Find settings.py path for both script and frozen modes
+            if getattr(sys, 'frozen', False):
+                # Running as EXE - settings.py should be bundled
+                settings_path = os.path.join(sys._MEIPASS, "settings.py")
+            else:
+                # Running as script
+                settings_path = os.path.join(os.path.dirname(__file__), "settings.py")
+            
+            if os.path.exists(settings_path):
+                # Launch settings with the correct python interpreter
+                if getattr(sys, 'frozen', False):
+                    # For frozen EXE, extract and run with system python
+                    subprocess.Popen(["python", settings_path], cwd=os.path.dirname(settings_path))
+                else:
+                    subprocess.Popen([sys.executable, settings_path])
+            else:
+                print(f"Settings file not found at {settings_path}")
+        except Exception as e:
+            print(f"Failed to launch settings: {e}")
     
     def restart_app(self, icon=None, item=None):
         """Restart the widget application"""
@@ -1769,6 +1835,23 @@ class MediaWidget(tk.Tk):
                             break
                     except:
                         continue
+                
+                # DEBOUNCE: If we recently had a playing session, wait before showing paused
+                if not hasattr(self, '_last_had_playing'):
+                    self._last_had_playing = has_playing_session
+                    self._playing_lost_time = None
+                
+                if not has_playing_session and self._last_had_playing:
+                    # Just lost playing session - start timer
+                    if self._playing_lost_time is None:
+                        self._playing_lost_time = time.time()
+                    # Wait 1 second before showing paused (allows song transition)
+                    if time.time() - self._playing_lost_time < 1.0:
+                        has_playing_session = True  # Pretend we still have playing
+                elif has_playing_session:
+                    # Reset debounce timer
+                    self._playing_lost_time = None
+                    self._last_had_playing = True
                 
                 best_session = None
                 best_priority = -1  # Higher = better
