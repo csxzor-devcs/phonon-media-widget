@@ -1209,11 +1209,19 @@ class MediaWidget(tk.Tk):
             pystray.MenuItem("Restart", self.restart_app),
             pystray.MenuItem("Quit", self.quit_app)
         )
-        self.tray_icon = pystray.Icon("MediaIsland", image, "Media Island", menu)
+        self.tray_icon = pystray.Icon("Phonon", image, "Phonon", menu)
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
 
     def create_tray_icon(self):
-        # Simple white circle on black
+        # Load the custom icon
+        try:
+            if os.path.exists("icon.ico"):
+                return Image.open("icon.ico")
+            elif os.path.exists("icon.png"):
+                return Image.open("icon.png")
+        except: pass
+        
+        # Fallback: Simple white circle on black
         image = Image.new('RGB', (64, 64), (0, 0, 0))
         dc = ImageDraw.Draw(image)
         dc.ellipse((10, 10, 54, 54), fill="white")
